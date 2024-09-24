@@ -1,0 +1,688 @@
+---
+title: 'Nested-CV: High-dimensional Logistic Regression'
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: false
+    toc_depth: 3
+    number_sections: true
+    theme: united
+---
+
+
+```{r setup, include=FALSE}
+library("nestedcv")
+library("glmnet")
+library("caret")
+library("lightgbm")
+library("ModelMetrics")
+library("ggplot2")
+
+
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+
+## Performance CI functions
+
+```{r, echo=FALSE}
+
+weighted.var <- function(x, wt) {
+  xm <- weighted.mean(x, wt)
+  weighted.mean( (x-xm)^2, wt ) * (sum(wt)/(sum(wt)-1))
+}
+
+weighted.sd <- function(x, wt) {
+  sqrt(weighted.var(x, wt))
+}
+
+##############################################
+# standard CV
+##############################################
+
+#' Cross-validation
+#'
+#' Performs standard k-fold cross-validation to estimate prediction
+#' error and provide a confidence interval for it.
+#'
+#' @param X A nxp data matrix.
+#' @param Y A n-vector of responses
+#' @param n_folds Number of folds, an integer.
+#' @param alpha Nominal type-I error level. Must be in (0,.5)
+#' @param funcs A list of containing three functions used as subroutines:
+#'   \describe{
+#'     \item{\code{fitter}}{A function taking X and Y and returning a model fit object.}
+#'     \item{\code{predictor}}{A function taking a model fit object from above
+#'     and X' and returning a vector of predictions.}
+#'     \item{\code{loss}}{A function taking a vector of predictions and true values returning
+#'     a vector of losses.}
+#'   }
+#' @param w Weights for each observation in Y. A numeric vector of the same length as Y.
+#'          Each weight corresponds to the importance of the observation in the analysis.
+#'          Default is equal weights for all observations.
+#'          
+#' @return
+#' \describe{
+#'   \item{\code{mean}}{Point estimate of prediction error: mean of CV prediction errors.}
+#'   \item{\code{ci_lo}}{Lower endpoint of naive CV interval for prediction error.}
+#'   \item{\code{ci_hi}}{Lower endpoint of naive CV interval for prediction error.}
+#'   \item{\code{sd}}{Standard deviation of CV prediction errors.}
+#'   \item{\code{raw_errors}}{Errors for each point, a vector of same length as input Y.}
+#'   \item{\code{fold_id}}{The fold assignmnet for each point, a vector of same length as input Y.}
+#' }
+#'
+#' @export
+naive_cv <- function(X, Y, funcs, w = rep(1, length(Y)), n_folds = 10, alpha = .1,
+                     trans = list(identity), funcs_params = NULL, fold_id = NULL) {
+
+  even_folds_idx <- 1:(nrow(X) %/% n_folds * n_folds)
+  X <- X[even_folds_idx, ]
+  Y <- Y[even_folds_idx]
+  w <- w[even_folds_idx]
+  if(is.null(fold_id)) {
+    # fold_id <- (1:nrow(X)) %% n_folds + 1
+    # fold_id <- sample(fold_id)
+    fold_id <- caret:::createFolds(Y, k = n_folds, list = F)
+  }
+  
+  errors <- c()
+  gp_errors <- c()
+  weights <- c()
+
+  for(k in 1:n_folds) {
+    if(sum(w[fold_id == k]) <= 0) stop("weight sum <= 0")
+    
+    fit <- funcs$fitter(X[fold_id != k, ], Y[fold_id != k],
+                        funcs_params = funcs_params)
+    y_hat <- funcs$predictor(fit, X[fold_id == k, ],
+                             funcs_params = funcs_params)
+    error_k <- funcs$loss(y_hat, Y[fold_id == k])
+    w_k <- w[fold_id == k]
+
+    
+    errors <- c(errors, error_k)
+    weights <- c(weights, w_k)
+
+    temp_vec <- c()
+    for(tran in trans) {
+      temp_vec <- c(temp_vec, tran(weighted.mean(error_k, w_k)))
+    }
+    gp_errors <- rbind(gp_errors, temp_vec)
+  }
+
+  return(list(
+    "err_hat" = weighted.mean(errors, weights),
+    "ci_lo" = weighted.mean(errors, weights) - qnorm(1-alpha/2) * weighted.sd(errors, weights) / sqrt(sum(weights)),
+    "ci_hi" = weighted.mean(errors, weights) + qnorm(1-alpha/2) * weighted.sd(errors, weights) / sqrt(sum(weights)),
+    "raw_mean" = weighted.mean(errors, weights),
+    "sd" = weighted.sd(errors, weights),
+    "group_err_hat" = apply(gp_errors, 2, mean),
+    "group_sd" = apply(gp_errors, 2, sd),
+    "raw_errors" = errors,
+    "fold_id" = fold_id
+  ))
+}
+
+##############################################
+# nested CV
+##############################################
+
+
+#' nested Cross-validation
+#'
+#' Performs nested k-fold cross-validation, aggregating over many random splits of the data.
+#' Provides a confidence interval for prediction interval that is more accurate than that of
+#' standard cross-validation.
+#'
+#' @param X A nxp data matrix.
+#' @param Y A n-vector of responses
+#' @param funcs A list of containing three functions used as subroutines:
+#'   \describe{
+#'     \item{\code{fitter}}{A function taking X and Y and returning a model fit object.}
+#'     \item{\code{predictor}}{A function taking a model fit object from above
+#'     and X' and returning a vector of predictions.}
+#'     \item{\code{loss}}{A function taking a vector of predictions and true values returning
+#'     a vector of losses.}
+#'   }
+#' @param n_folds Number of folds, an integer.
+#' @param reps Number of repitions of nested CV to combine. Many iterations are needed for stability.
+#' @param alpha Nominal type-I error level. Must be in (0,.5)
+#' @param w Weights for each observation in Y. A numeric vector of the same length as Y.
+#'          Each weight corresponds to the importance of the observation in the analysis.
+#'          Default is equal weights for all observations.
+#'          
+#' @return
+#' \describe{
+#'   \item{\code{mean}}{Point estimate of prediction error: mean of CV prediction errors.}
+#'   \item{\code{ci_lo}}{Lower endpoint of naive CV interval for prediction error.d}
+#'   \item{\code{ci_hi}}{Lower endpoint of naive CV interval for prediction error.d}
+#'   \item{\code{sd_infl}}{The multiplicative factor needed to correct the interval width.}
+#'   \item{\code{sd}}{Standard deviation of CV prediction errors.}
+#'   \item{\code{raw_errors}}{Errors for each point, a vector of same length as input Y.}
+#'   \item{\code{fold_id}}{The fold assignmnet for each point, a vector of same length as input Y.}
+#'   \item{\code{running_sd_infl}}{The value of "sd_infl" after each repitition. This is used
+#'     to evaluate how stable the estimate is and if more replicates are needed.}
+#' }
+#'
+#' @export
+nested_cv <- function(X, Y, funcs, w = rep(1, length(Y)), reps = 50, n_folds = 10,  alpha = .1,
+                      bias_reps = NA,
+                      funcs_params = NULL, n_cores = 1, verbose = F) {
+  #estimate time required
+  if(verbose) {
+    t1 <- Sys.time()
+    temp <- nested_cv_helper(X, Y, funcs, w, n_folds,
+                                        funcs_params = funcs_params)
+    t2 <- Sys.time()
+    print(paste0("Estimated time required: ", (t2 - t1) * reps))
+  }
+
+  #compute out-of-fold errors on SE scale
+  var_pivots <- c()
+  gp_errs <- c()
+  ho_errs <- c()
+  ho_weights <- c()
+  if(n_cores == 1){
+    raw <- lapply(1:reps, function(i){nested_cv_helper(X, Y, funcs, w, n_folds,
+                                                                  funcs_params = funcs_params)})
+  } else {
+    raw <- parallel::mclapply(1:reps, function(i){nested_cv_helper(X, Y, funcs,
+                                                                   w, n_folds,
+                                                                   funcs_params = funcs_params)},
+                              mc.cores = n_cores)
+  }
+  for(i in 1:reps) {
+    temp <- raw[[i]]
+    var_pivots <- rbind(var_pivots, temp$pivots)
+    ho_errs <- c(ho_errs, temp$errs)
+    ho_weights <- c(ho_weights, temp$weights)
+  }
+  
+  # Use all_ho_errs and all_ho_weights for weighted mean and sd calculations
+  sd_weighted <- weighted.sd(ho_errs, ho_weights)
+  n_effective <- sum(ho_weights)
+  
+  n_sub <- floor(sum(w) * (n_folds - 1) / n_folds)
+  # Look at the estimate of inflation after each repetition
+  ugp_infl <- sqrt(max(0, mean(var_pivots[, 1]^2 - var_pivots[, 2]))) / (sd_weighted / sqrt(n_sub))
+  # ugp_infl <- max(1, min(ugp_infl, sqrt(n_folds)))
+  ugp_infl <- max(1, ugp_infl)
+
+  # Estimate of inflation at each time step
+  infl_est2 <- sqrt(pmax(0, sapply(1:reps, function(i){
+    mean(var_pivots[1:(i * n_folds), 1]^2 - var_pivots[1:(i * n_folds), 2])
+  }))) / (sd_weighted / sqrt(n_sub))
+
+  #bias correction
+  cv_means <- c() #estimated pred error from normal CV
+  bias_est <- 0
+  if(is.na(bias_reps)) {
+    bias_reps <- ceiling(reps / 5) #fewer reps for bias estimation
+  }
+  if(bias_reps == 0) {
+    bias_est <- 0
+  }
+  else {
+    for(i in 1:bias_reps) {
+      temp <- naive_cv(X, Y, funcs, w, n_folds, funcs_params = funcs_params)
+      cv_means <- c(cv_means, temp$err_hat)
+    }
+
+    bias_est <- (weighted.mean(ho_errs, ho_weights) - mean(cv_means)) * (1 + ((n_folds - 2) / (n_folds ))^(1.5))
+  }
+  pred_est <- weighted.mean(ho_errs, ho_weights) - bias_est #debiased estimate
+
+  list("sd_infl" = ugp_infl,
+       "err_hat" = pred_est,
+       "ci_lo" = pred_est - qnorm(1-alpha/2) * sd_weighted / sqrt(sum(w)) * ugp_infl,
+       "ci_hi" = pred_est + qnorm(1-alpha/2) * sd_weighted / sqrt(sum(w)) * ugp_infl,
+       "raw_mean" = weighted.mean(ho_errs, ho_weights),
+       "bias_est" = bias_est,
+       "sd" = sd_weighted,
+       "running_sd_infl" = infl_est2)
+}
+
+#' Internal helper for nested_cv
+#'
+#' Randomly assigns folds and does one iteration of nested cross-validation.
+#'
+#' arguments as in the "nested_cv" function
+#'
+#' @return
+#' \describe{
+#'   \item{\code{pivots}}{A vector of same length as Y of difference statistics.}
+#'   \item{\code{errors}}{A vector of all errors of observations not used in model training.}
+#' }
+
+nested_cv_helper <- function(X, Y, funcs, w = rep(1, length(Y)), n_folds = 10, funcs_params = NULL) {
+  # fold_id <- 1:nrow(X) %% n_folds + 1
+  # fold_id <- sample(fold_id[1:(nrow(X) %/% n_folds * n_folds)]) #handle case where n doesn't divide n_folds
+  # fold_id <- c(fold_id, rep(0, nrow(X) %% n_folds))
+  even_folds_idx <- 1:(nrow(X) %/% n_folds * n_folds)
+  X <- X[even_folds_idx, ]
+  Y <- Y[even_folds_idx]
+  w <- w[even_folds_idx]
+  fold_id <- caret:::createFolds(Y, k = n_folds, list = F)
+  
+  for(f in 1:n_folds){
+    if(sum(w[fold_id == f]) <= 0) stop("weight sum <= 0")
+  }
+
+  # Nested CV model fitting
+  ho_errors <- array(0, dim = c(n_folds, n_folds, nrow(X) %/% n_folds))
+  ho_weights <- array(0, dim = c(n_folds, n_folds, nrow(X) %/% n_folds)) # Same shape as ho_errors
+  #^ entry i, j is error on fold i,
+  # when folds i & j are not used for model fitting.
+  for(f1 in 1:(n_folds - 1)) {
+    for(f2 in (f1+1):n_folds) {
+      test_idx1 <- which(fold_id == f1)
+      test_idx2 <- which(fold_id == f2)
+      fit <- funcs$fitter(X[-c(test_idx1, test_idx2), ], Y[-c(test_idx1, test_idx2)], funcs_params = funcs_params)
+      preds <- funcs$predictor(fit, X, funcs_params = funcs_params)
+      
+            # Inside the loop over folds in nested_cv_helper
+      ho_errors[f1, f2, ] <- funcs$loss(preds[test_idx1], Y[test_idx1])
+      ho_errors[f2, f1, ] <- funcs$loss(preds[test_idx2], Y[test_idx2])
+
+
+      # Store corresponding weights
+      ho_weights[f1, f2, ] <- w[test_idx1]
+      ho_weights[f2, f1, ] <- w[test_idx2]
+    }
+  }
+
+  out_mat <- matrix(0, n_folds, 2)
+  for(f1 in 1:(n_folds)) {
+    test_idx <- which(fold_id == f1)
+    fit <- funcs$fitter(X[-test_idx, ], Y[-test_idx], funcs_params = funcs_params)
+    preds <- funcs$predictor(fit, X[test_idx, ], funcs_params = funcs_params)
+    e_out <- funcs$loss(preds, Y[test_idx])
+    w_out <- w[test_idx]
+    
+    # # Check if lengths of e_out and w_out are equal
+    # if (length(e_out) != length(w_out)) {
+    #   stop(paste0("Error: Length mismatch between errors and weights for fold ", f1, 
+    #               ". Length of e_out: ", length(e_out), 
+    #               ", length of w_out: ", length(w_out)))
+
+    # Loop over other folds to calculate e_bar_t
+    e_bar_t <- c()
+    w_e_bar_t <- c() # Collect corresponding weights
+    for(f2 in 1:n_folds) {
+      if(f2 == f1) { next }
+      idx_e_bar_t <- which(fold_id == f2)
+      e_bar_t <- c(e_bar_t, ho_errors[f2, f1, ])
+      w_e_bar_t <- c(w_e_bar_t, w[idx_e_bar_t])
+    }
+    out_mat[f1, 1] <- weighted.mean(e_bar_t, w_e_bar_t) - weighted.mean(e_out, w_out) # (a) terms
+    out_mat[f1, 2] <- weighted.var(e_out, w_out) / sum(w_out) # (b) terms
+  }
+  
+
+  # Errors on points not used for fitting, combined across all runs (used for point estimate)
+  all_ho_errs <- c()
+  all_ho_weights <- c()
+  for(f1 in 1:(n_folds - 1)) {
+    for(f2 in (f1+1):n_folds) {
+      all_ho_errs <- c(all_ho_errs, ho_errors[f1, f2, ], ho_errors[f2, f1, ])
+      all_ho_weights <- c(all_ho_weights, ho_weights[f1, f2, ], ho_weights[f2, f1, ])
+    }
+  }
+
+  return(list("pivots" = out_mat,
+              "errs" = all_ho_errs,
+              "weights" = all_ho_weights))
+}
+
+
+binom_ci <- function(X, Y, w = rep(1, length(Y)), funcs, alpha = .1, valid_frac = .8, funcs_params = NULL) {
+  
+  idx <- createDataPartition(Y, p = 1-valid_frac, list = FALSE, times = 1)
+  
+  fit <- funcs$fitter(X[idx, ], Y[idx],
+                      funcs_params = funcs_params)
+  y_hat <- funcs$predictor(fit, X[-idx, ],
+                           funcs_params = funcs_params)
+  error_valid <- funcs$loss(y_hat, Y[-idx])
+  w_valid <- w[-idx]
+  p_valid <- weighted.mean(error_valid, w_valid)
+  res <- prop.test(p_valid * sum(w_valid), sum(w_valid), conf.level = 1-alpha)
+  
+  return(list(
+    "err_hat" = res$estimate,
+    "ci_lo" = res$conf.int[1],
+    "ci_hi" = res$conf.int[2]
+  ))
+
+}
+
+repeated_cv_dietterich <- function(X, Y, funcs, 
+                           n_folds = 2, n_rep = 5, alpha = .1,
+                           trans = list(identity), funcs_params = NULL, 
+                           fold_id = NULL) {
+
+  if(is.null(fold_id)) {
+    fold_id <- caret:::createMultiFolds(Y, k = n_folds, times = n_rep)
+  }
+  
+  mean_sum <- 0
+  variance_sum <- 0
+  cv_metrics <- rep(NA, n_folds)
+  
+  for(r in 1:n_rep) {
+    for(k in 1:n_folds){
+      idx <- fold_id[[names(fold_id)[n_folds * (r-1) + k]]]
+      fit <- funcs$fitter(X[idx, ], Y[idx],
+                          funcs_params = funcs_params)
+      y_hat <- funcs$predictor(fit, X[-idx, ],
+                               funcs_params = funcs_params)
+      cv_metrics[k] <- funcs$loss(y_hat, Y[-idx])
+    }
+    error_mean <- mean(cv_metrics)
+    error_var <- var(cv_metrics)
+    mean_sum <- mean_sum + error_mean
+    variance_sum <- variance_sum + error_var
+  }
+  
+  cv_mean <- (1/n_rep)*mean_sum
+  cv_sd <- sqrt((1/n_rep)*variance_sum)
+  t_quant <- qt(1-(alpha/2), n_rep*(n_folds - 1))
+  ci_lo <- cv_mean - cv_sd*t_quant
+  ci_hi <- cv_mean + cv_sd*t_quant
+
+  return(list(
+    "err_hat" = cv_mean,
+    "ci_lo" = ci_lo,
+    "ci_hi" = ci_hi,
+    "sd" = cv_sd
+  ))
+}
+
+```
+
+
+## Loss Functions
+
+```{r, echo=FALSE}
+
+misclass_loss <- function(ypred, y) {
+  (ypred != y)
+}
+
+cross_entropy_loss <- function(ypred, y) {
+  -(y * log(ypred) + (1-y) * log(1-ypred))
+}
+
+error_rate_loss <- function(ypred, y) {
+  mean(misclass_loss(y, ypred))
+}
+
+recall_loss <- function(ypred, y) {
+  recall(y, ypred)
+}
+
+balanced_error_rate_loss <- function(ypred, y) {
+  pos_frac <- sum(y)/length(y)
+  c_fracs <- c(pos_frac, 1-pos_frac)
+  c_weights <- 1/c_fracs
+  w <- ifelse(y, c_weights[1], c_weights[2])
+  
+  weighted.mean(misclass_loss(y, ypred), w = w)
+}
+
+mean_cross_entropy_loss <- function(ypred, y) {
+  mean(cross_entropy_loss(ypred, y))
+}
+
+weighted_mean_cross_entropy_loss <- function(ypred, y) {
+  pos_frac <- sum(y)/length(y)
+  c_fracs <- c(pos_frac, 1-pos_frac)
+  c_weights <- 2*(1/c_fracs)
+  w <- ifelse(y, c_weights[1], c_weights[2])
+  
+  weighted.mean(cross_entropy_loss(ypred, y), w = w)
+}
+```
+
+## Weight functions
+
+```{r}
+equal_weights <- function(Y) rep(1, length(Y))
+
+positives <- function(Y) Y
+
+balanced_weights <- function(Y) {
+  
+  pos_frac <- sum(Y)/length(Y)
+  c_fracs <- c(pos_frac, 1-pos_frac)
+  c_weights <- 1/c_fracs
+  w <- ifelse(Y, c_weights[1], c_weights[2])
+  
+}
+```
+
+
+## Fitting function
+
+```{r, echo=FALSE}
+
+# Used parameters from here to match Pat's post: https://lightgbm.readthedocs.io/en/latest/pythonapi/lightgbm.LGBMClassifier.html
+
+lightgbm_params <- list(
+      boosting_type='gbdt', num_leaves=31, max_depth=-1, learning_rate=0.1, n_estimators=100,
+      subsample_for_bin=200000, min_split_gain=0.0, min_child_weight=0.001, min_child_samples=20,
+      subsample=1.0, subsample_freq=0, colsample_bytree=1.0, reg_alpha=0.0, reg_lambda=0.0, importance_type='split'
+    )
+
+fitter_lightgbm <- function(X, Y, idx = NA, funcs_params = NA) {
+  if(sum(is.na(idx)) > 0) {idx <- 1:nrow(X)}
+  fit <- lightgbm(
+    data = X[idx, ], label = Y[idx], objective = "binary", 
+    params = lightgbm_params,
+    verbose = -1
+  )
+  fit
+}
+
+predictor_pred_lightgbm <- function(fit, X_new, funcs_params = NA) {
+  predict(fit, X_new, type = "class")
+} 
+
+predictor_prob_lightgbm <- function(fit, X_new, funcs_params = NA) {
+  predict(fit, X_new)
+} 
+
+lightgbm_funs <- list(fitter = fitter_lightgbm,
+                            predictor = predictor_pred_lightgbm,
+                            loss = misclass_loss,
+                            name = "lightgbm")
+
+```
+
+
+## Simulation function
+
+```{r}
+run_lightgbm_cv <- function(n_splits, weight, true_error_loss, lightgbm_loss_1,
+                            lightgbm_loss_2, lightgbm_predictor = predictor_pred_lightgbm) {
+  
+  lightgbm_funs$predictor <- lightgbm_predictor
+  results_ls <- vector("list", n_splits)
+  
+  for (i in 1:n_splits) {
+    
+    df_train <- train_data_list[[i]]
+    df_test <- test_data_list[[i]]
+    
+    Y <- as.numeric(df_train$BSEP)
+    X <- data.matrix(df_train[, grepl("fp", colnames(df_train))])
+    w <- weight(Y)
+    
+    Y_test <- as.numeric(df_test$BSEP)
+    X_test <- data.matrix(df_test[, grepl("fp", colnames(df_test))])
+    
+    fit <- lightgbm(
+      data = X, label = Y, objective = "binary", 
+      params = lightgbm_params,
+      verbose = -1
+    )
+    
+    true_error <- true_error_loss(lightgbm_funs$predictor(fit, X_test), Y_test)
+    
+    results_ls[[i]] <- list(
+      true_error = true_error
+    )
+    
+    lightgbm_funs$loss <- lightgbm_loss_1
+    
+    t1 <- Sys.time()
+    set.seed(seed)
+    nested_cv_results <- nested_cv(X, Y, lightgbm_funs, w = w, 
+                               n_folds = nested_n_folds, reps  = nested_cv_reps, verbose = T)
+    t2 <- Sys.time()
+    print(t2 - t1)
+    
+    naive_cv_results <- naive_cv(X, Y, lightgbm_funs, w = w, 
+                               n_folds = nested_n_folds)
+    
+    results_ls[[i]]$nested_cv_ci_lo <- nested_cv_results$ci_lo
+    results_ls[[i]]$nested_cv_ci_hi <- nested_cv_results$ci_hi
+    results_ls[[i]]$naive_cv_ci_lo <- naive_cv_results$ci_lo
+    results_ls[[i]]$naive_cv_ci_hi <- naive_cv_results$ci_hi
+    
+    binom_ci_results <- binom_ci(X, Y, w, funcs = lightgbm_funs, alpha = .1, valid_frac = .1)
+    
+    results_ls[[i]]$binom_ci_lo <- round(binom_ci_results$ci_lo, 3)
+    results_ls[[i]]$binom_ci_hi <- round(binom_ci_results$ci_hi, 3)
+    
+    lightgbm_funs$loss <- lightgbm_loss_2
+    rep5x2_ci_results <- repeated_cv_dietterich(X, Y, n_folds = 2, 
+                                                n_rep = 5, funcs = lightgbm_funs,
+                                                alpha = .1)
+    
+    results_ls[[i]]$rep5x2_ci_lo <- round(rep5x2_ci_results$ci_lo, 3)
+    results_ls[[i]]$rep5x2_ci_hi <- round(rep5x2_ci_results$ci_hi, 3)
+    
+    rep5x5_ci_results <- repeated_cv_dietterich(X, Y, n_folds = diet_n_folds, 
+                                                n_rep = diet_reps, funcs = lightgbm_funs,
+                                                alpha = .1)
+    results_ls[[i]]$rep5x5_ci_lo <- round(rep5x5_ci_results$ci_lo, 3)
+    results_ls[[i]]$rep5x5_ci_hi <- round(rep5x5_ci_results$ci_hi, 3)
+    
+    print(paste0("Split ", i, " - True error: ", round(true_error, 3)))
+  }
+  
+  return(results_ls)
+}
+```
+
+
+
+# Setup
+
+## Global Parameters
+
+```{r}
+nested_n_folds <- 5; nested_cv_reps <- 50
+diet_n_folds <- 5; diet_reps <- 5
+n_metrics <- 4; n_splits <- 20
+
+out_ls <- vector("list", n_metrics)
+```
+
+## Process data 
+
+```{r}
+df <- read.csv("MTL_2_input_BSEP_herg_BBB_PDK_HIV_w_FP.csv")
+
+seed <- 101
+set.seed(seed)
+
+splits <- createDataPartition(df$BSEP, p = 0.9, list = FALSE, times = n_splits)
+
+train_data_list <- list()
+test_data_list <- list()
+
+for (i in 1:n_splits) {
+  train_data_list[[i]] <- df[splits[, i], ]
+  test_data_list[[i]] <- df[-splits[, i], ]
+}
+```
+
+# Results
+
+## Error Rate
+
+```{r}
+results_ls <- run_lightgbm_cv(
+  n_splits = n_splits,
+  weight = equal_weights,
+  true_error_loss = error_rate_loss,
+  lightgbm_loss_1 = misclass_loss,
+  lightgbm_loss_2 = error_rate_loss
+)
+result_df <- do.call(rbind, lapply(results_ls, as.data.frame))
+out_ls[[1]] <- result_df
+result_df
+```
+
+## Recall
+
+```{r}
+results_ls <- run_lightgbm_cv(
+  n_splits = n_splits,
+  weight = positives,
+  true_error_loss = recall_loss,
+  lightgbm_loss_1 = misclass_loss,
+  lightgbm_loss_2 = recall_loss
+)
+
+result_df <- do.call(rbind, lapply(results_ls, as.data.frame))
+out_ls[[2]] <- result_df
+result_df
+```
+
+
+## Balanced error rate
+
+Equally weighting positive and negative classes in error rate estimation.
+
+```{r}
+results_ls <- run_lightgbm_cv(
+  n_splits = n_splits,
+  weight = balanced_weights,
+  true_error_loss = balanced_error_rate_loss,
+  lightgbm_loss_1 = misclass_loss,
+  lightgbm_loss_2 = balanced_error_rate_loss
+)
+
+result_df <- do.call(rbind, lapply(results_ls, as.data.frame))
+out_ls[[3]] <- result_df
+result_df
+```
+
+## Cross Entropy
+
+```{r}
+results_ls <- run_lightgbm_cv(
+  n_splits = n_splits,
+  weight = equal_weights,
+  true_error_loss = mean_cross_entropy_loss,
+  lightgbm_loss_1 = cross_entropy_loss,
+  lightgbm_loss_2 = mean_cross_entropy_loss,
+  lightgbm_predictor = predictor_prob_lightgbm
+)
+
+# results_ls$true_error <- NULL
+result_df <- do.call(rbind, lapply(results_ls, as.data.frame))
+out_ls[[4]] <- result_df
+result_df
+```
+
+
+```{r}
+saveRDS(results_ls, file = "results_20rep.rds")
+```
+
+
