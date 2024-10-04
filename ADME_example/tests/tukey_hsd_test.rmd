@@ -1,6 +1,18 @@
+---
+title: "Tukey HSD tests"
+output: html_document
+date: "2024-10-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
 library(lmerTest)
 library(multcomp)
+```
 
+
+```{r}
 df <- read.csv("df_scaffold_split.csv")
 
 metric_name <- "prec"
@@ -18,4 +30,5 @@ confint(test_out)
 
 old.par <- par(mai=c(1.5,3,1,1))
 plot(test_out)
+```
 
