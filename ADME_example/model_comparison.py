@@ -203,8 +203,6 @@ def mcs_plot(pc, effect_size, means, labels=True, cmap=None, cbar_ax_bbox=None,
     Returns:
     matplotlib.axes.Axes: The axes with the heatmap.
     """
-    pc_copy = pc.copy()
-
     for key in ['cbar', 'vmin', 'vmax', 'center']:
         if key in kwargs:
             del kwargs[key]
@@ -214,7 +212,7 @@ def mcs_plot(pc, effect_size, means, labels=True, cmap=None, cbar_ax_bbox=None,
     if reverse_cmap:
         cmap = cmap + "_r"
 
-    significance = pc_copy.astype(object)
+    significance = pc.copy().astype(object)
     significance[(pc < 0.001) & (pc >= 0)] = '***'
     significance[(pc < 0.01) & (pc >= 0.001)] = '**'
     significance[(pc < 0.05) & (pc >= 0.01)] = '*'
@@ -239,9 +237,6 @@ def mcs_plot(pc, effect_size, means, labels=True, cmap=None, cbar_ax_bbox=None,
                             rotation_mode='anchor')
         hax.set_yticklabels(y_label_list, size=axis_text_size, ha='center', va='center', rotation=90,
                             rotation_mode='anchor')
-    else:
-        hax.set_xlabel('')
-        hax.set_ylabel('')
 
     hax.set_xlabel('')
     hax.set_ylabel('')
