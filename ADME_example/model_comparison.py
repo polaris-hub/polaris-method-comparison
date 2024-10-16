@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pingouin as pg
+from scipy import stats
 import seaborn as sns
 from scipy.stats import spearmanr
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, precision_score, recall_score
@@ -160,32 +161,46 @@ def make_boxplots_parametric(df, metric_ls):
         ax.set_xticklabels(new_xtick_labels)
     plt.tight_layout()
 
-
-def make_normality_diagnostic(df, metric_ls, val_col, pred_col, classification_threshold, group_col="method",
-                              cycle_col="cv_cycle"):
+def make_normality_diagnostic(df, metric_ls):
     """
-    Create a grid of histograms with KDE plots for each metric and method.
+    Create a normality diagnostic plot grid with histograms and QQ plots for the given metrics.
 
     Parameters:
     df (pd.DataFrame): Input dataframe containing the data.
-    metric_ls (list of str): List of metric column names to create plots for.
+    metric_ls (list of str): List of metrics to create plots for.
 
     Returns:
     None
     """
-    df_metrics = calc_regression_metrics(df, cycle_col=cycle_col, val_col=val_col, pred_col=pred_col,
-                                         thresh=classification_threshold)
-    df_scaffold_split = df_metrics.query("split == 'scaffold'").copy()
+    df_norm = df.copy()
+    
+    for metric in metric_ls:
+        df_norm[metric] = df_norm[metric] - df_norm.groupby("method")[metric].transform("mean")
 
-    df_scaffold_split_stacked = df_scaffold_split.melt(id_vars=[cycle_col, group_col, "split"],
-                                                       value_vars=metric_ls,
-                                                       var_name="metric",
-                                                       value_name="value")
-    sns.set_context('notebook', font_scale=1)  # Increase font scale
+    df_norm = df_norm.melt(id_vars=["cv_cycle", "method", "split"],
+                                   value_vars=metric_ls,
+                                   var_name="metric",
+                                   value_name="value")
+
+    sns.set_context('notebook', font_scale=1.5)
     sns.set_style('whitegrid')
-    figure = sns.FacetGrid(df_scaffold_split_stacked, col="method", row="metric", sharex=False, sharey=False,
-                           height=1.5, aspect=2.5)
-    figure.map_dataframe(sns.histplot, x="value", kde=True)
+    
+    metrics = df_norm['metric'].unique()
+    n_metrics = len(metrics)
+    
+    fig, axes = plt.subplots(2, n_metrics, figsize=(20, 10))
+    
+    for i, metric in enumerate(metrics):
+        ax = axes[0, i]
+        sns.histplot(df_norm[df_norm['metric'] == metric]['value'], kde=True, ax=ax)
+        ax.set_title(f'{metric}', fontsize=16)
+    
+    for i, metric in enumerate(metrics):
+        ax = axes[1, i]
+        metric_data = df_norm[df_norm['metric'] == metric]['value']
+        stats.probplot(metric_data, dist="norm", plot=ax)
+        ax.set_title("")
+    
     plt.tight_layout()
 
 
