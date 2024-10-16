@@ -242,8 +242,9 @@ def mcs_plot(pc, effect_size, means, labels=True, cmap=None, cbar_ax_bbox=None,
                       vmin=-vlim if vlim else None, vmax=vlim if vlim else None, **kwargs)
 
     if labels:
-        y_label_list = list(means.index)
-        x_label_list = [x + f'\n{means.loc[x].round(2)}' for x in y_label_list]
+        label_list = list(means.index)
+        x_label_list = [x + f'\n{means.loc[x].round(2)}' for x in label_list]
+        y_label_list = [x + f'\n{means.loc[x].round(2)}\n' for x in label_list]
         hax.set_xticklabels(x_label_list, size=axis_text_size, ha='center', va='top', rotation=0,
                             rotation_mode='anchor')
         hax.set_yticklabels(y_label_list, size=axis_text_size, ha='center', va='center', rotation=90,
