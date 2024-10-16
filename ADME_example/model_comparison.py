@@ -10,11 +10,13 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, p
 from statsmodels.stats.anova import AnovaRM
 from statsmodels.stats.libqsturng import psturng, qsturng
 
+import math
+
 
 def calc_regression_metrics(df, cycle_col, val_col, pred_col, thresh):
     """
     Calculate regression metrics (MAE, MSE, R2, prec, recall) for each method and split
-x
+
     :param df: input dataframe must contain columns [method, split] as well the columns specified in the arguments
     :param cycle_col: column indicating the cross-validation fold
     :param val_col: column with the ground truth value
@@ -43,7 +45,7 @@ x
     return metric_df
 
 
-def rm_tukey_hsd(df, metric, group_col, alpha=0.05):
+def rm_tukey_hsd(df, metric, group_col, alpha=0.05, sort = False, direction_dict=None):
     """
     Perform repeated measures Tukey HSD test on the given dataframe.
 
@@ -52,6 +54,7 @@ def rm_tukey_hsd(df, metric, group_col, alpha=0.05):
     metric (str): The metric column name to perform the test on.
     group_col (str): The column name indicating the groups.
     alpha (float): Significance level for the test. Default is 0.05.
+    sort (bool): Whether to sort the output tables. Default is False.
 
     Returns:
     tuple: A tuple containing:
@@ -60,7 +63,15 @@ def rm_tukey_hsd(df, metric, group_col, alpha=0.05):
         - df_means_diff (pd.DataFrame): DataFrame with mean differences between groups.
         - pc (pd.DataFrame): DataFrame with adjusted p-values for pairwise comparisons.
     """
-    df_means = df.groupby(group_col).mean(numeric_only=True)
+    if sort and direction_dict and metric in direction_dict:
+        if direction_dict[metric] == 'maximize':
+            df_means = df.groupby(group_col).mean(numeric_only=True).sort_values(metric, ascending=False)
+        elif direction_dict[metric] == 'minimize':
+            df_means = df.groupby(group_col).mean(numeric_only=True).sort_values(metric, ascending=True)
+        else:
+            raise ValueError("Invalid direction. Expected 'maximize' or 'minimize'.")
+    else:
+        df_means = df.groupby(group_col).mean(numeric_only=True)
 
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=RuntimeWarning,
@@ -69,7 +80,7 @@ def rm_tukey_hsd(df, metric, group_col, alpha=0.05):
     mse = aov.loc[1, 'MS']
     df_resid = aov.loc[1, 'DF']
 
-    methods = df[group_col].unique()
+    methods = df_means.index
     n_groups = len(methods)
     n_per_group = df[group_col].value_counts().mean()
 
@@ -246,7 +257,7 @@ def mcs_plot(pc, effect_size, means, labels=True, cmap=None, cbar_ax_bbox=None,
 
 def make_mcs_plot_grid(df, stats, group_col, alpha=.05,
                        figsize=(20, 10), direction_dict=None, effect_dict=None, show_diff=True,
-                       cell_text_size=16, axis_text_size=12, title_text_size=16):
+                       cell_text_size=16, axis_text_size=12, title_text_size=16, sort_axes=False):
     """
     Create a grid of multiple comparison of means plots using Tukey HSD test results.
 
@@ -262,11 +273,13 @@ def make_mcs_plot_grid(df, stats, group_col, alpha=.05,
     cell_text_size (int): Font size for the cell text. Default is 16.
     axis_text_size (int): Font size for the axis text. Default is 12.
     title_text_size (int): Font size for the title text. Default is 16.
+    sort (bool): Whether to sort the axes. Default is False.
 
     Returns:
     None
     """
-    fig, ax = plt.subplots(2, 3, figsize=figsize)
+    nrow = math.ceil(len(stats) / 3)
+    fig, ax = plt.subplots(nrow, 3, figsize=figsize)
 
     for i, stat in enumerate(stats):
         row = i // 3
@@ -276,7 +289,8 @@ def make_mcs_plot_grid(df, stats, group_col, alpha=.05,
         if direction_dict[stat] == 'minimize':
             reverse_cmap = True
 
-        _, df_means, df_means_diff, pc = rm_tukey_hsd(df, stat, group_col, alpha=alpha)
+        _, df_means, df_means_diff, pc = rm_tukey_hsd(df, stat, group_col, alpha,
+                                                       sort_axes, direction_dict)
 
         hax = mcs_plot(pc, effect_size=df_means_diff, means=df_means[stat],
                        show_diff=show_diff, ax=ax[row, col], cbar=True,
@@ -286,8 +300,8 @@ def make_mcs_plot_grid(df, stats, group_col, alpha=.05,
         # hax.legend(loc='upper right')
 
     # If there are less plots than cells in the grid, hide the remaining cells
-    if len(stats) < 6:
-        for i in range(len(stats), 6):
+    if (len(stats) % 3) != 0:
+        for i in range(len(stats), nrow * 3):
             row = i // 3
             col = i % 3
             ax[row, col].set_visible(False)
