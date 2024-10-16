@@ -379,6 +379,7 @@ def ci_plot(result_tab, ax_in, name):
     ax.set_xlabel("Mean Difference")
     ax.set_ylabel("")
     ax.set_title(name)
+    ax.set_xlim(-0.2, 0.2) 
 
 
 def make_ci_plot_grid(df_in, metric_list, group_col="method"):
@@ -393,7 +394,7 @@ def make_ci_plot_grid(df_in, metric_list, group_col="method"):
      Returns:
      None
      """
-    figure, axes = plt.subplots(len(metric_list), 1, figsize=(8, 2 * len(metric_list)), sharex=True)
+    figure, axes = plt.subplots(len(metric_list), 1, figsize=(8, 2 * len(metric_list)), sharex=False)
     if not isinstance(axes, np.ndarray):
         axes = np.array([axes])
     for i, metric in enumerate(metric_list):
