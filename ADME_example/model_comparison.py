@@ -254,7 +254,7 @@ def mcs_plot(pc, effect_size, means, labels=True, cmap=None, cbar_ax_bbox=None,
 
     hax = sns.heatmap(effect_size, cmap=cmap, annot=annotations, fmt='', cbar=show_cbar, ax=ax,
                       annot_kws={"size": cell_text_size},
-                      vmin=-vlim if vlim else None, vmax=vlim if vlim else None, **kwargs)
+                      vmin=-2*vlim if vlim else None, vmax=2*vlim if vlim else None, **kwargs)
 
     if labels:
         label_list = list(means.index)
@@ -272,7 +272,7 @@ def mcs_plot(pc, effect_size, means, labels=True, cmap=None, cbar_ax_bbox=None,
 
 
 def make_mcs_plot_grid(df, stats, group_col, alpha=.05,
-                       figsize=(20, 10), direction_dict=None, effect_dict=None, show_diff=True,
+                       figsize=(20, 10), direction_dict={}, effect_dict={}, show_diff=True,
                        cell_text_size=16, axis_text_size=12, title_text_size=16, sort_axes=False):
     """
     Create a grid of multiple comparison of means plots using Tukey HSD test results.
@@ -297,9 +297,26 @@ def make_mcs_plot_grid(df, stats, group_col, alpha=.05,
     nrow = math.ceil(len(stats) / 3)
     fig, ax = plt.subplots(nrow, 3, figsize=figsize)
 
+    # Set defaults
+    for key in ['r2', 'rho', 'prec', 'recall', 'mae', 'mse']:
+        direction_dict.setdefault(key, 'maximize' if key in ['r2', 'rho', 'prec', 'recall'] else 'minimize')
+
+    for key in ['r2', 'rho', 'prec', 'recall']:
+        effect_dict.setdefault(key, 0.1)
+
+    direction_dict = {k.lower(): v for k, v in direction_dict.items()}
+    effect_dict = {k.lower(): v for k, v in effect_dict.items()}
+
     for i, stat in enumerate(stats):
+        stat = stat.lower()
+
         row = i // 3
         col = i % 3
+
+        if stat not in direction_dict:
+            raise ValueError(f"Stat '{stat}' is missing in direction_dict. Please set its value.")
+        if stat not in effect_dict:
+            raise ValueError(f"Stat '{stat}' is missing in effect_dict. Please set its value.")
 
         reverse_cmap = False
         if direction_dict[stat] == 'minimize':
