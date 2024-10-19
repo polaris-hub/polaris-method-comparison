@@ -1,9 +1,6 @@
 ---
-title: "Nested-CV: High-dimensional Logistic Regression"
+title: "Supplementary Materials: Repeated CV Simulation Results"
 output:
-  pdf_document:
-    toc: yes
-    toc_depth: '3'
   html_document:
     toc: yes
     toc_float: yes
@@ -11,6 +8,9 @@ output:
     toc_depth: 3
     number_sections: yes
     theme: united
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
 ---
 
 
