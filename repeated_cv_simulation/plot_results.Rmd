@@ -1,12 +1,15 @@
 ---
-title: 'Nested-CV: High-dimensional Logistic Regression'
-output: 
+title: "Nested-CV: High-dimensional Logistic Regression"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
   html_document:
-    toc: true
-    toc_float: true
-    toc_collapsed: false
+    toc: yes
+    toc_float: yes
+    toc_collapsed: no
     toc_depth: 3
-    number_sections: true
+    number_sections: yes
     theme: united
 ---
 
@@ -54,6 +57,7 @@ The problem with Dietterich's paper is that it was written in 1998. The guidance
 
 We found 5x5 CV CIs provided intervals with good coverage of test set performance and reasonably low expected width.  These results suggest that statistical tests utilizing 5x5 CV will have good control of type I error rate and statistical power.  Other advantages of 5x5 CV over nested CV are that it can be easily extended to any performance metric and methods for statistical testing based on repeated CV have already been developed and studied.
 
+\newpage 
 
 # Figure 1: Interval stability comparison
 
@@ -106,11 +110,15 @@ for (j in seq_along(results_ls)){
 }
 ```
 
+\newpage
+
 ## Error rate
 
 ```{r}
 print(combined_plot[[1]])
 ```
+
+\newpage
 
 ## Recall
 
@@ -118,11 +126,15 @@ print(combined_plot[[1]])
 print(combined_plot[[2]])
 ```
 
+\newpage
+
 ## Balanced error rate
 
 ```{r}
 print(combined_plot[[3]])
 ```
+
+\newpage
 
 ## Entropy
 
@@ -130,6 +142,7 @@ print(combined_plot[[3]])
 print(combined_plot[[4]])
 ```
 
+\newpage
 
 # Figure 2: Interval method comparison
 
@@ -172,6 +185,7 @@ print(combined_plot)
 
 ```
 
+\newpage
 
 # Figure 3: Coverage probability and interval width
 
@@ -253,11 +267,15 @@ interval_width_grid <- plot_grid(all_plots$interval_width_plot_1, all_plots$inte
                                  ncol = 2)
 ```
 
+\newpage
+
 ## Coverage probability
 
 ```{r}
 print(coverage_grid)
 ```
+
+\newpage
 
 ## Interval width
 

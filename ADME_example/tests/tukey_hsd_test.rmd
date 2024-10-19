@@ -1,6 +1,8 @@
 ---
 title: "Tukey HSD tests"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 date: "2024-10-04"
 ---
 
@@ -13,7 +15,7 @@ library(multcomp)
 
 
 ```{r}
-df <- read.csv("df_scaffold_split.csv")
+df <- read.csv("scaffold_split_metrics.csv")
 
 metric_name <- "prec"
 df[[metric_name]] <- as.numeric(df[[metric_name]])
