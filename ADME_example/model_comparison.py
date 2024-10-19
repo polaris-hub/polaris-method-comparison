@@ -330,7 +330,6 @@ def make_mcs_plot_grid(df, stats, group_col, alpha=.05,
                        cell_text_size=cell_text_size, axis_text_size=axis_text_size,
                        reverse_cmap=reverse_cmap, vlim=effect_dict[stat])
         hax.set_title(stat.upper(), fontsize=title_text_size)
-        # hax.legend(loc='upper right')
 
     # If there are less plots than cells in the grid, hide the remaining cells
     if (len(stats) % 3) != 0:

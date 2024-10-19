@@ -8,11 +8,9 @@ import pandas as pd
 
 def main():
     dataset_name = "sol_processed.csv"
-    ds = pd.read_csv(dataset_name)
+    df = pd.read_csv(dataset_name)
     y = "Sol" 
-    # get the dataframe from the Polaris dataset
-    df = ds.dropna(subset=y).copy()
-    df.rename(columns={"smiles" : "SMILES"},inplace=True)
+    df.dropna(subset=y, inplace=True)
     print(f"Processing {y} with {len(df)} records")
     model_list = [("chemprop_st",ChemPropWrapper),
                   ("chemprop_mt",ChemPropMultitaskWrapper),
