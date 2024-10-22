@@ -120,3 +120,5 @@ we need to inverse transform them before returning them.
     pred = self.ffnn.predict(np.stack(X))
     return self.y_scaler.inverse_transform(pred.reshape(-1, 1)).ravel()
 ```
+
+There are also several example wrappers in this directory. 
