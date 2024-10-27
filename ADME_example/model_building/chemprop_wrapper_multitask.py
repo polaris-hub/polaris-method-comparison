@@ -15,7 +15,7 @@ class ChemPropMultitaskWrapper:
     def validate(self, train, test):
         with tempfile.TemporaryDirectory() as temp_dirname:
         
-            st_cols = ["SMILES", "Name", "Sol", "HLM_CLint", "RLM_CLint", "ER", "HPPB", "RPPB"]
+            st_cols = ["SMILES", "Sol", "HLM_CLint", "RLM_CLint", "ER", "HPPB", "RPPB"]
 
             train['Sol_bins'] = pd.cut(train['Sol'], bins=10, labels=False)
             train, val = train_test_split(train, test_size=0.1, stratify=train['Sol_bins'], random_state=42)
@@ -41,7 +41,6 @@ class ChemPropMultitaskWrapper:
                 '--num_folds', '1',
                 '--epochs', '30',
                 '--ensemble_size', '10',
-                '--ignore_columns', 'Name',
                 '--smiles_columns', 'SMILES',
                 '--quiet',
                 '--dataset_type', 'regression',
@@ -70,9 +69,9 @@ class ChemPropMultitaskWrapper:
             return result_df['Sol'].values
 
 def main():
-    df = pd.read_csv("https://raw.githubusercontent.com/PatWalters/datafiles/refs/heads/main/biogen_logS.csv")
+    df = pd.read_csv("sol_processed.csv")
     train, test = train_test_split(df)
-    chemprop_wrapper = ChemPropMultitaskWrapper("logS")
+    chemprop_wrapper = ChemPropMultitaskWrapper("Sol")
     pred = chemprop_wrapper.validate(train, test)
     print(pred)
 
