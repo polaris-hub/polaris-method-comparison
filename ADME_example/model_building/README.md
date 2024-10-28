@@ -1,6 +1,9 @@
-# ml_benchmark
+# Model building
 
-A set of routines for benchmarking ML methods in drug discovery. The script **run_benchmark.py** can be used to run benchmarks.  All that is necessary for the script is a wrapper class that wraps an ML model and supports a **validate** method. The wrapper class is instantiated with the name of column to be predicted.  The validate method takes dataframes containing training and test sets as input and returns a list of predicted values for the test set. For examples of wrapper classes see **chemprop_wrapper.py** and **lgbm_wrapper.py**. If the ML method requires a validation set, this can be created inside the wrapper by further splitting the training set. 
+1. `process_data.ipynb` pulls data from Polaris and processes the data for model building. See the [quick start guide](https://polaris-hub.github.io/polaris/stable/quickstart.html) to Polaris.
+2. `run_benchmark.py` runs 5x5 repeated cross validation and saves results for downstream analysis.
+
+**run_benchmark.py** was adapted from [ml_benchmark](https://github.com/PatWalters/ml_benchmark).  All that is necessary for the script is a wrapper class that wraps an ML model and supports a **validate** method. The wrapper class is instantiated with the name of column to be predicted.  The validate method takes dataframes containing training and test sets as input and returns a list of predicted values for the test set. For examples of wrapper classes see **chemprop_wrapper.py** and **lgbm_wrapper.py**. If the ML method requires a validation set, this can be created inside the wrapper by further splitting the training set. 
 
 ```python
 df = pd.read_csv("myfile.csv")
@@ -23,8 +26,6 @@ model_list = [("chemprop",ChemPropWrapper),("lgbm_morgan", LGBMMorganCountWrappe
 group_list = [("random", uru.get_random_clusters),("butina", uru.get_butina_clusters)]
 result_df = uru.cross_validate(df,model_list,y,group_list)
 ```
-
-The notebook **analyze_crossval.ipynb** reads a file output by **run_benchmark.py**, makes several useful plots, and uses [Tukey's Honestly Signficant Difference (HSD) Test](https://en.wikipedia.org/wiki/Tukey%27s_range_test) to invalidate the null hypothesis that the means of the methods are the same. 
 
 
 
