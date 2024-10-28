@@ -11,9 +11,9 @@ We're also working with the team at www.polarishub.io to design a novel way of e
 ## Where to go from here?
 To simplify adoption of the proposed guidelines, this repository includes some code snippets and examples that can hopefully help.
 
-`ADME_example/ML_Regression_Comparison.ipynb` demonstrates the primary statistical testing workflow we are recommending.
+The primary statistical testing workflow we are recommending: `ADME_example/ML_Regression_Comparison.ipynb`.
 
-Additional code that may be of interest:
+Additional code that:
 
 1. **Case study:** All code related to the case study discussed in Section 3.3.1 can be found in the the `ADME_example/` folder.
 2. **Experiment (CV):** All code related to the experiment discussed in Section can be found in the `repeated_cv_simulation/` folder.
