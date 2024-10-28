@@ -1,0 +1,8 @@
+lightgbm 
+chemprop==1.6.1 
+git+https://github.com/PatWalters/useful_rdkit_utils
+pandas
+pingouin 
+seaborn 
+matplotlib 
+scikit-learn
