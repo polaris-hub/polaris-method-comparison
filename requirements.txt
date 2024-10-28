@@ -6,3 +6,4 @@ pingouin
 seaborn 
 matplotlib 
 scikit-learn
+polaris

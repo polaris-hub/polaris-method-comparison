@@ -136,5 +136,5 @@ rever/
 # VS Code
 .vscode/
 
-# Generated requirements.txt
-requirements.txt
+# # Generated requirements.txt
+# requirements.txt
