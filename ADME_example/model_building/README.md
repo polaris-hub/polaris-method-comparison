@@ -1,7 +1,7 @@
 # Model building
 
-1. `process_data.ipynb` pulls data from Polaris and processes the data for model building. See the [quick start guide](https://polaris-hub.github.io/polaris/stable/quickstart.html) to Polaris.
-2. `run_benchmark.py` runs 5x5 repeated cross validation and saves results for downstream analysis.
+1. `01_process_data.ipynb` pulls data from Polaris and processes the data for model building. See the [quick start guide](https://polaris-hub.github.io/polaris/stable/quickstart.html) to Polaris.
+2. `02_run_benchmark.py` runs 5x5 repeated cross validation and saves results for downstream analysis.
 
 **run_benchmark.py** was adapted from [ml_benchmark](https://github.com/PatWalters/ml_benchmark).  All that is necessary for the script is a wrapper class that wraps an ML model and supports a **validate** method. The wrapper class is instantiated with the name of column to be predicted.  The validate method takes dataframes containing training and test sets as input and returns a list of predicted values for the test set. For examples of wrapper classes see **chemprop_wrapper.py** and **lgbm_wrapper.py**. If the ML method requires a validation set, this can be created inside the wrapper by further splitting the training set. 
 
