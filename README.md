@@ -11,6 +11,12 @@ We're also working with the team at www.polarishub.io to design a novel way of e
 ## Where to go from here?
 To simplify adoption of the proposed guidelines, this repository includes some code snippets and examples that can hopefully help.
 
+To install dependencies:
+
+```
+pip install -r requirements.txt
+```
+
 The primary statistical testing workflow we are recommending is here: `ADME_example/ML_Regression_Comparison.ipynb`.
 
 Additional code of interest:
