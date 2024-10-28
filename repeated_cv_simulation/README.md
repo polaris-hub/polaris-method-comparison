@@ -1,1 +1,1 @@
-Simulation results are presented in `plot_results.pdf`
+Simulation results are presented in `simulation_results.pdf`
