@@ -1,6 +1,8 @@
 ## ADME modeling case study
 
-This directory contains the case study shown in Section 3.3.1. `ML_Regression_Comparison.ipynb` demonstrates the recommended statistical testing workflow.
+This directory contains the case study shown in Section 3.3.1. 
+
+`ML_Regression_Comparison.ipynb` demonstrates the recommended statistical testing workflow.
 
 `model_building` contains the following:
 
