@@ -2,7 +2,7 @@
 
 from chemprop_wrapper import ChemPropWrapper
 from chemprop_wrapper_multitask import ChemPropMultitaskWrapper
-from lgbm_wrapper import LGBMMorganCountWrapper, LGBMPropWrapper
+from lgbm_wrapper import LGBMMorganCountWrapper
 import useful_rdkit_utils as uru
 import pandas as pd
 
