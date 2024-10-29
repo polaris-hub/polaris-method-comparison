@@ -22,8 +22,8 @@ The primary statistical testing workflow we are recommending is here: `ADME_exam
 Additional code of interest:
 
 1. **Case study:** All code related to the case study discussed in Section 3.3.1 can be found in the the `ADME_example/` folder.
-2. **Experiment (CV):** All code related to the experiment discussed in Section can be found in the `repeated_cv_simulation/` folder.
-3. **Figure (Dynamic Range)**: All code related to Figure can be found in the `Dynamic_Range_example/` folder.
+2. **Experiment (CV):** All code related to the experiment discussed in Appendix B can be found in the `repeated_cv_simulation/` folder.
+3. **Figure (Dynamic Range)**: All code related to Figure 4 can be found in the `Dynamic_Range_example/` folder.
 
 ## How to cite
 [![DOI](https://img.shields.io/badge/DOI-10.xxxx%2Fxxxxx--xxx--xxxxx--x-blue)]()
