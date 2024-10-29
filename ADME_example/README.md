@@ -1,6 +1,6 @@
 ## ADME modeling case study
 
-This directory contains the case study from [Practically significant method comparison protocols for machine learning in small molecule drug discovery](). 
+This directory contains code for the main case study in the paper.
 
 The primary statistical testing workflow we are recommending is here: `ML_Regression_Comparison.ipynb`.
 
