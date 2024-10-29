@@ -4,13 +4,6 @@ This directory contains the case study from [Practically significant method comp
 
 The primary statistical testing workflow we are recommending is here: `ML_Regression_Comparison.ipynb`.
 
-The `model_building` directory contains:
+`model_building` contains code for data processing and 5x5 repeated cross validation.
 
-1. `01_process_data.ipynb` pulls data from Polaris and processes the data for model building. See the [quick start guide](https://polaris-hub.github.io/polaris/stable/quickstart.html) to Polaris.
-2. `02_run_benchmark.py` runs 5x5 repeated cross validation and saves results for downstream analysis.
-
-The `supplementary_workflows` directory contains:
-
-1. Statistical testing for classification models (`ML_Classification_Comparison.ipynb`)
-2. Statistical testing for exceptional cases (`ML_Regression_Comparison_nonparametric.ipynb`)
-3. Additional visualization ideas (`alternate_visualizations.ipynb`) 
+`supplementary_workflows` contains additional workflows.
