@@ -6,7 +6,7 @@ This repository includes the code for the [Practically significant method compar
 ## We would love to hear from you!
 We've done our best to come up with sensible guidelines, but would love to hear from you. Is there anything we missed? The best way to get in touch is by opening a Github issue in this repository.
 
-We're also working with the team at www.polarishub.io to design a novel way of evaluation and comparing methods in drug discovery that goes beyond the typical leaderboard. If you're interested in helping us shape these ideas by giving feedback on early designs, [please reach out]().
+We're also working with the team at www.polarishub.io to design a novel way of evaluation and comparing methods in drug discovery that goes beyond the typical leaderboard. If you're interested in helping us shape these ideas by giving feedback on early designs, [please reach out](https://github.com/polaris-hub/polaris-method-comparison/discussions).
 
 ## Where to go from here?
 To simplify adoption of the proposed guidelines, this repository includes some code snippets and examples that can hopefully help.
