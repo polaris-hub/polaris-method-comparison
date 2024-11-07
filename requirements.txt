@@ -7,3 +7,4 @@ seaborn
 matplotlib 
 scikit-learn
 polaris
+git+https://github.com/maximtrp/scikit-posthocs

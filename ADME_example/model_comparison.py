@@ -10,6 +10,14 @@ from scipy.stats import spearmanr
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, precision_score, recall_score
 from statsmodels.stats.anova import AnovaRM
 from statsmodels.stats.libqsturng import psturng, qsturng
+from matplotlib import cm
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import roc_curve, precision_recall_curve
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import roc_auc_score, average_precision_score, matthews_corrcoef, precision_score, recall_score
+import scikit_posthocs as sp
+
 
 import math
 
@@ -159,6 +167,47 @@ def make_boxplots_parametric(df, metric_ls):
         new_xtick_labels = ["\n".join(x.split("_")) for x in label_text_list]
         ax.set_xticks(list(range(0, len(x_tick_labels))))
         ax.set_xticklabels(new_xtick_labels)
+    plt.tight_layout()
+
+def make_boxplots_nonparametric(df, metric_ls):
+    sns.set_context('notebook')
+    sns.set(rc={'figure.figsize': (4, 3)}, font_scale=1.5)
+    sns.set_style('whitegrid')
+    figure, axes = plt.subplots(1, 6, sharex=False, sharey=False, figsize=(28, 8))
+
+    for i, stat in enumerate(metric_ls):
+        friedman = pg.friedman(df, dv=stat, within="method", subject="cv_cycle")['p-unc'].values[0]
+        ax = sns.boxplot(y=stat, x="method", hue="method", ax=axes[i], data=df, palette="Set2", legend=False)
+        title = stat.replace("_", " ").upper()
+        ax.set_title(f"p={friedman:.1e}")
+        ax.set_xlabel("")
+        ax.set_ylabel(title)
+        x_tick_labels = ax.get_xticklabels()
+        label_text_list = [x.get_text() for x in x_tick_labels]
+        new_xtick_labels = ["\n".join(x.split("_")) for x in label_text_list]
+        ax.set_xticks(list(range(0, len(x_tick_labels))))
+        ax.set_xticklabels(new_xtick_labels)
+    plt.tight_layout()
+        
+def make_sign_plots_nonparametric(df, metric_ls):
+    heatmap_args = {'linewidths': 0.25, 'linecolor': '0.5', 'clip_on': True, 'square': True}
+    sns.set(rc={'figure.figsize': (4, 3)}, font_scale=1.5)
+    figure, axes = plt.subplots(1, 6, sharex=False, sharey=True, figsize=(26, 8))
+
+    for i, stat in enumerate(metric_ls):
+        pc = sp.posthoc_conover_friedman(df, y_col=stat, group_col="method", block_col="cv_cycle", p_adjust="holm",
+                                         melted=True)
+        sub_ax, sub_c = sp.sign_plot(pc, **heatmap_args, ax=axes[i], xticklabels=True)  # Update xticklabels parameter
+        sub_ax.set_title(stat.upper())
+
+def make_critical_difference_diagrams(df, metric_ls):
+    figure, axes = plt.subplots(6, 1, sharex=True, sharey=False, figsize=(16, 10))
+    for i, stat in enumerate(metric_ls):
+        avg_rank = df.groupby("cv_cycle")[stat].rank(pct=True).groupby(df.method).mean()
+        pc = sp.posthoc_conover_friedman(df, y_col=stat, group_col="method", block_col="cv_cycle", p_adjust="holm",
+                                         melted=True)
+        sp.critical_difference_diagram(avg_rank, pc, ax=axes[i])
+        axes[i].set_title(stat.upper())
     plt.tight_layout()
 
 def make_normality_diagnostic(df, metric_ls):
@@ -432,4 +481,92 @@ def make_ci_plot_grid(df_in, metric_list, group_col="method"):
         df_tukey, _, _, _ = rm_tukey_hsd(df_in, metric, group_col=group_col)
         ci_plot(df_tukey, ax_in=axes[i], name=metric)
     figure.suptitle("Multiple Comparison of Means\nTukey HSD, FWER=0.05")
+    plt.tight_layout()
+
+
+def recall_at_precision(y_true, y_score, precision_threshold=0.5, direction='greater'):
+    if direction not in ['greater', 'lesser']:
+        raise ValueError("Invalid direction. Expected one of: ['greater', 'lesser']")
+
+    y_true = np.array(y_true)
+    y_score = np.array(y_score)
+    thresholds = np.unique(y_score)
+    thresholds = np.sort(thresholds)
+
+    if direction == 'greater':
+        thresholds = np.sort(thresholds)
+    else:  
+        thresholds = np.sort(thresholds)[::-1]
+
+    for threshold in thresholds:
+        if direction == 'greater':
+            y_pred = y_score >= threshold
+        else:  
+            y_pred = y_score <= threshold
+
+        precision = precision_score(y_true, y_pred)
+        if precision >= precision_threshold:
+            recall = recall_score(y_true, y_pred)
+            return recall, threshold
+    return np.nan, None
+
+def calc_classification_metrics(df_in, cycle_col, val_col, prob_col, pred_col):
+    metric_list = []
+    for k, v in df_in.groupby([cycle_col, "method", "split"]):
+        cycle, method, split = k
+        roc_auc = roc_auc_score(v[val_col], v[prob_col])
+        pr_auc = average_precision_score(v[val_col], v[prob_col])
+        mcc = matthews_corrcoef(v[val_col], v[pred_col])
+        
+        recall, _ = recall_at_precision(v[val_col].astype(bool), v[prob_col], precision_threshold=0.8, direction='greater')
+        tnr, _ = recall_at_precision(~v[val_col].astype(bool), v[prob_col], precision_threshold=0.8, direction='lesser')
+
+        metric_list.append([cycle, method, split, roc_auc, pr_auc, mcc, recall, tnr])
+        
+    metric_df = pd.DataFrame(metric_list, columns=["cv_cycle", "method", "split",
+                                                    "roc_auc", "pr_auc", "mcc", "recall", "tnr"])
+    return metric_df
+
+
+def make_curve_plots(df):
+    df_plot = df.query("cv_cycle == 0 and split == 'scaffold'").copy()
+    color_map = plt.get_cmap('tab10')
+    le = LabelEncoder()
+    df_plot['color'] = le.fit_transform(df_plot['method'])
+    colors = color_map(df_plot['color'].unique())
+    val_col = "Sol"
+    prob_col = "Sol_prob"
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    for (k, v), color in zip(df_plot.groupby("method"), colors):
+        roc_auc = roc_auc_score(v[val_col], v[prob_col])
+        pr_auc = average_precision_score(v[val_col], v[prob_col])
+        fpr, recall_pos, thresholds_roc = roc_curve(v[val_col], v[prob_col])
+        precision, recall, thresholds_pr = precision_recall_curve(v[val_col], v[prob_col])
+
+        _, threshold_recall_pos = recall_at_precision(v[val_col].astype(bool), v[prob_col], precision_threshold=0.8, direction='greater')
+        _, threshold_recall_neg = recall_at_precision(~v[val_col].astype(bool), v[prob_col], precision_threshold=0.8, direction='lesser')
+
+        fpr_recall_pos = fpr[np.abs(thresholds_roc - threshold_recall_pos).argmin()]
+        fpr_recall_neg = fpr[np.abs(thresholds_roc - threshold_recall_neg).argmin()]
+        recall_recall_pos = recall[np.abs(thresholds_pr - threshold_recall_pos).argmin()]
+        recall_recall_neg = recall[np.abs(thresholds_pr - threshold_recall_neg).argmin()]
+
+        axes[0].plot(fpr, recall_pos, label=f"{k} (ROC AUC={roc_auc:.03f})", color=color, alpha=0.75)
+        axes[1].plot(recall, precision, label=f"{k} (PR AUC={pr_auc:.03f})", color=color, alpha=0.75)
+
+        axes[0].axvline(fpr_recall_pos, color=color, linestyle=':', alpha=0.75)
+        axes[0].axvline(fpr_recall_neg, color=color, linestyle='--', alpha=0.75)
+        axes[1].axvline(recall_recall_pos, color=color, linestyle=':', alpha=0.75)
+        axes[1].axvline(recall_recall_neg, color=color, linestyle='--', alpha=0.75)
+
+    axes[0].plot([0, 1], [0, 1], "--", color="black", lw=0.5)
+    axes[0].set_xlabel("False Positive Rate")
+    axes[0].set_ylabel("True Positive Rate")
+    axes[0].set_title("ROC Curve")
+    axes[0].legend()
+    axes[1].set_xlabel("Recall")
+    axes[1].set_ylabel("Precision")
+    axes[1].set_title("Precision-Recall Curve")
+    axes[1].legend()
     plt.tight_layout()
