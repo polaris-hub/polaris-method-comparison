@@ -3,6 +3,11 @@
 
 This repository includes the code for the [Practically significant method comparison protocols for machine learning in small molecule drug discovery](https://doi.org/10.26434/chemrxiv-2024-6dbwv-v2) preprint. This work is part of the [Polaris](https://polarishub.io/guidelines/small-molecules) initiative. To learn more, see also our [Nature Machine Intelligence Correspondence](https://doi.org/10.1038/s42256-024-00911-w).
 
+## Webinar
+We hosted [a webinar](https://github.com/polaris-hub/polaris-method-comparison/discussions/6) on December 5th to present the paper. 
+
+You can find the recording here: https://www.youtube.com/watch?v=qaqw2wNNdqE
+
 ## We would love to hear from you!
 We've done our best to come up with sensible guidelines, but would love to hear from you. Is there anything we missed? The best way to get in touch is by starting a Github discussion in this repository.
 
