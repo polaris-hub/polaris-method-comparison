@@ -16,6 +16,12 @@ We're also working with the team at www.polarishub.io to design a novel way of e
 ## Where to go from here?
 To simplify adoption of the proposed guidelines, this repository includes some code snippets and examples that can hopefully help.
 
+## Important Note
+To use the software in this repo, you must first install GitHub Large File Storage (LFS). For more information on LFS, please see this page.
+
+https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage
+
+
 To install dependencies:
 
 ```
