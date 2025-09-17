@@ -1,10 +1,10 @@
 # Polaris - Method Comparison Guidelines
-[![DOI](https://img.shields.io/badge/DOI-10.26434%2Fchemrxiv--2024--6dbwv--v2-blue)](https://doi.org/10.26434/chemrxiv-2024-6dbwv-v2)
+[![DOI](https://img.shields.io/badge/DOI-10.1021%2F--acs--jcim--5c01609-blue)](https://doi.org/10.1021/acs.jcim.5c01609)
 
-This repository includes the code for the [Practically significant method comparison protocols for machine learning in small molecule drug discovery](https://doi.org/10.26434/chemrxiv-2024-6dbwv-v2) preprint. This work is part of the [Polaris](https://polarishub.io/guidelines/small-molecules) initiative. To learn more, see also our [Nature Machine Intelligence Correspondence](https://doi.org/10.1038/s42256-024-00911-w).
+This repository includes the code for the [Practically significant method comparison protocols for machine learning in small molecule drug discovery]([https://doi.org/10.26434/chemrxiv-2024-6dbwv-v2](https://doi.org/10.1021/acs.jcim.5c01609)) publication in JCIM. This work is part of the [Polaris](https://polarishub.io/guidelines/small-molecules) initiative. To learn more, see also our [Nature Machine Intelligence Correspondence](https://doi.org/10.1038/s42256-024-00911-w).
 
 ## Webinar
-We hosted [a webinar](https://github.com/polaris-hub/polaris-method-comparison/discussions/6) on December 5th to present the paper. 
+We hosted [a webinar](https://github.com/polaris-hub/polaris-method-comparison/discussions/6) on December 5th, 2023 to present the paper. 
 
 You can find the recording here: https://www.youtube.com/watch?v=qaqw2wNNdqE
 
@@ -37,19 +37,20 @@ Additional code of interest:
 3. **Figure (Dynamic Range)**: All code related to Figure 4 can be found in the `Dynamic_Range_example/` folder.
 
 ## How to cite
-[![DOI](https://img.shields.io/badge/DOI-10.26434%2Fchemrxiv--2024--6dbwv--v2-blue)](https://doi.org/10.26434/chemrxiv-2024-6dbwv-v2)
-
-```
-Ash JR, Wognum C, Rodríguez-Pérez R, Aldeghi M, Cheng AC, Clevert D-A, et al.
-Practically significant method comparison protocols for machine learning in small molecule drug discovery.
-ChemRxiv. 2024; doi:10.26434/chemrxiv-2024-6dbwv-v2
-This content is a preprint and has not been peer-reviewed.
-```
+[![DOI](https://img.shields.io/badge/DOI-10.1021%2F--acs--jcim--5c01609-blue)](https://doi.org/10.1021/acs.jcim.5c01609)
 
 ```bib
-@article{ash2024practically,
-  title={Practically significant method comparison protocols for machine learning in small molecule drug discovery.},
-  author={Ash, Jeremy R and Wognum, Cas and Rodr{\'\i}guez-P{\'e}rez, Raquel and Aldeghi, Matteo and Cheng, Alan C and Clevert, Djork-Arn{\'e} and Engkvist, Ola and Fang, Cheng and Price, Daniel J and Hughes-Oliver, Jacqueline M and others},
-  year={2024}
+@article{doi:10.1021/acs.jcim.5c01609,
+	title        = {Practically Significant Method Comparison Protocols for Machine Learning in Small Molecule Drug Discovery},
+	author       = {Ash, Jeremy R. and Wognum, Cas and Rodríguez-P{\'e}rez, Raquel and Aldeghi, Matteo and Cheng, Alan C. and Clevert, Djork-Arn{\'e} and Engkvist, Ola and Fang, Cheng and Price, Daniel J. and Hughes-Oliver, Jacqueline M. and Walters, W. Patrick},
+	year         = {0},
+	journal      = {Journal of Chemical Information and Modeling},
+	volume       = {0},
+	number       = {0},
+	pages        = {null},
+	doi          = {10.1021/acs.jcim.5c01609},
+	url          = {https://doi.org/10.1021/acs.jcim.5c01609},
+	note         = {PMID: 40932128},
+	eprint       = {https://doi.org/10.1021/acs.jcim.5c01609}
 }
 ```
