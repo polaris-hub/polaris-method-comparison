@@ -195,17 +195,17 @@ def make_sign_plots_nonparametric(df, metric_ls):
     figure, axes = plt.subplots(1, 6, sharex=False, sharey=True, figsize=(26, 8))
 
     for i, stat in enumerate(metric_ls):
-        pc = sp.posthoc_conover_friedman(df, y_col=stat, group_col="method", block_col="cv_cycle", p_adjust="holm",
-                                         melted=True)
+        pivot_df = df.pivot(index='cv_cycle', columns='method', values=stat)
+        pc = sp.posthoc_conover_friedman(pivot_df, p_adjust="holm")
         sub_ax, sub_c = sp.sign_plot(pc, **heatmap_args, ax=axes[i], xticklabels=True)  # Update xticklabels parameter
         sub_ax.set_title(stat.upper())
 
 def make_critical_difference_diagrams(df, metric_ls):
     figure, axes = plt.subplots(6, 1, sharex=True, sharey=False, figsize=(16, 10))
     for i, stat in enumerate(metric_ls):
+        pivot_df = df.pivot(index='cv_cycle', columns='method', values=stat)
+        pc = sp.posthoc_conover_friedman(pivot_df, p_adjust="holm")
         avg_rank = df.groupby("cv_cycle")[stat].rank(pct=True).groupby(df.method).mean()
-        pc = sp.posthoc_conover_friedman(df, y_col=stat, group_col="method", block_col="cv_cycle", p_adjust="holm",
-                                         melted=True)
         sp.critical_difference_diagram(avg_rank, pc, ax=axes[i])
         axes[i].set_title(stat.upper())
     plt.tight_layout()
